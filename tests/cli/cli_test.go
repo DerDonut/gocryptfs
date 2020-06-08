@@ -705,39 +705,98 @@ func TestSymlinkedCipherdir(t *testing.T) {
 func TestBadname(t *testing.T) {
 	dir := test_helpers.InitFS(t)
 	mnt := dir + ".mnt"
+	validFileName := "file"
+	invalidSuffix := ".invalid_file"
 
+	// use static suffix for testing
 	test_helpers.MountOrFatal(t, dir, mnt, "-badname=*", "-extpass=echo test")
 	defer test_helpers.UnmountPanic(mnt)
 
-	file := mnt + "/file"
-	err := ioutil.WriteFile(file, []byte("somecontent"), 0600)
+	// write one valid filename (empty content)
+	file := mnt + "/" + validFileName
+	err := ioutil.WriteFile(file, nil, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	invalid_file_name := "invalid_file"
-	invalid_file := dir + "/" + invalid_file_name
-	err = ioutil.WriteFile(invalid_file, []byte("somecontent"), 0600)
+	// read encrypted file name
+	fread, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fread.Close()
+
+	encryptedfilename := ""
+	ciphernames, err := fread.Readdirnames(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ciphername := range ciphernames {
+		if ciphername != "gocryptfs.conf" && ciphername != "gocryptfs.diriv" {
+			encryptedfilename = ciphername
+			// found cipher name of "file"
+			break
+		}
+	}
+
+	// write invalid file which should be decodable
+	err = ioutil.WriteFile(dir+"/"+encryptedfilename+invalidSuffix, nil, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// write invalid file which is not decodable (cropping the encrpyted file name)
+	err = ioutil.WriteFile(dir+"/"+encryptedfilename[:len(encryptedfilename)-2]+invalidSuffix, nil, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// check for filenames
 	f, err := os.Open(mnt)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
-
 	names, err := f.Readdirnames(0)
-	found := false
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundDecodable := false
+	foundUndecodable := false
 	for _, name := range names {
-		if strings.Contains(name, invalid_file_name) {
-			found = true
-			break
+		if strings.Contains(name, validFileName+invalidSuffix+" GOCRYPTFS_BAD_NAME") {
+			foundDecodable = true
+		} else if strings.Contains(name, encryptedfilename[:len(encryptedfilename)-2]+invalidSuffix+" GOCRYPTFS_BAD_NAME") {
+			foundUndecodable = true
 		}
 	}
 
-	if !found {
-		t.Errorf("did not find invalid name %s in %v", invalid_file_name, names)
+	if !foundDecodable {
+		t.Errorf("did not find invalid name %s in %v", validFileName+invalidSuffix+" GOCRYPTFS_BAD_NAME", names)
 	}
+
+	if !foundUndecodable {
+		t.Errorf("did not find invalid name %s in %v", encryptedfilename[:len(encryptedfilename)-2]+invalidSuffix+" GOCRYPTFS_BAD_NAME", names)
+	}
+}
+
+// TestPassfile tests the `-passfile` option
+func TestPassfile(t *testing.T) {
+	dir := test_helpers.InitFS(t)
+	mnt := dir + ".mnt"
+	passfile1 := mnt + ".1.txt"
+	ioutil.WriteFile(passfile1, []byte("test"), 0600)
+	test_helpers.MountOrFatal(t, dir, mnt, "-passfile="+passfile1)
+	defer test_helpers.UnmountPanic(mnt)
+}
+
+// TestPassfileX2 tests that the `-passfile` option can be passed twice
+func TestPassfileX2(t *testing.T) {
+	dir := test_helpers.InitFS(t)
+	mnt := dir + ".mnt"
+	passfile1 := mnt + ".1.txt"
+	passfile2 := mnt + ".2.txt"
+	ioutil.WriteFile(passfile1, []byte("te"), 0600)
+	ioutil.WriteFile(passfile2, []byte("st"), 0600)
+	test_helpers.MountOrFatal(t, dir, mnt, "-passfile="+passfile1, "-passfile="+passfile2)
+	defer test_helpers.UnmountPanic(mnt)
 }

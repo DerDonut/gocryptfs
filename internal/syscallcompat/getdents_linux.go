@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/hanwen/go-fuse/fuse"
+	"github.com/hanwen/go-fuse/v2/fuse"
 
 	"github.com/rfjakob/gocryptfs/internal/tlog"
 )
@@ -35,7 +35,17 @@ func getdents(fd int) ([]fuse.DirEntry, error) {
 	tmp := make([]byte, 10000)
 	for {
 		n, err := unix.Getdents(fd, tmp)
-		if err != nil {
+		// unix.Getdents has been observed to return EINTR on cifs mounts
+		if err == unix.EINTR {
+			if n > 0 {
+				smartBuf.Write(tmp[:n])
+			}
+			continue
+		} else if err != nil {
+			if smartBuf.Len() > 0 {
+				tlog.Warn.Printf("warning: unix.Getdents returned errno %d in the middle of data", err.(syscall.Errno))
+				return nil, syscall.EIO
+			}
 			return nil, err
 		}
 		if n == 0 {
