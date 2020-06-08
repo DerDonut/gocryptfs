@@ -6,11 +6,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/rfjakob/gocryptfs/internal/cryptocore"
 	"github.com/rfjakob/gocryptfs/internal/syscallcompat"
 	"github.com/rfjakob/gocryptfs/internal/tlog"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -114,6 +116,39 @@ func (be *NameTransform) EncryptAndHashName(name string, iv []byte) (string, err
 		return be.HashLongName(cName), nil
 	}
 	return cName, nil
+}
+
+func (be *NameTransform) EncryptAndHashBadName(name string, iv []byte, dirfd int) (cName string, err error) {
+	cNameInt, errInt := be.EncryptAndHashName(name, iv)
+	if errInt != nil {
+		return "", errInt
+	}
+	// check if file exists
+	var st unix.Stat_t
+	err = syscallcompat.Fstatat(dirfd, cNameInt, &st, unix.AT_SYMLINK_NOFOLLOW)
+	if err != nil && strings.HasSuffix(name, " GOCRYPTFS_BAD_NAME") {
+		// if this is the file name, check if it is a bad name
+		// check 1: undecryptable name?
+		err = syscallcompat.Fstatat(dirfd, name[:len(name)-len(" GOCRYPTFS_BAD_NAME")], &st, unix.AT_SYMLINK_NOFOLLOW)
+		if err != nil {
+			cNamePart := ""
+			// check 2: decrypted and appended suffix?
+			for charpos := len(name) - len(" GOCRYPTFS_BAD_NAME") - 1; charpos > 0; charpos-- {
+				//only use original cipher name and append assumed sufix (without badname flag)
+				cNamePart, err = be.EncryptAndHashName(name[:charpos], iv)
+				cNameBadReverse := cNamePart + name[charpos:len(name)-len(" GOCRYPTFS_BAD_NAME")]
+				err = syscallcompat.Fstatat(dirfd, cNameBadReverse, &st, unix.AT_SYMLINK_NOFOLLOW)
+				if err == nil {
+					return cNameBadReverse, nil
+				}
+			}
+		} else {
+			return name[:len(name)-len(" GOCRYPTFS_BAD_NAME")], nil
+
+		}
+	}
+
+	return cNameInt, nil
 }
 
 // Dir is like filepath.Dir but returns "" instead of ".".

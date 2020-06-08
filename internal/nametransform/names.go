@@ -23,6 +23,7 @@ type NameTransformer interface {
 	DecryptName(cipherName string, iv []byte) (string, error)
 	EncryptName(plainName string, iv []byte) string
 	EncryptAndHashName(name string, iv []byte) (string, error)
+	EncryptAndHashBadName(name string, iv []byte, dirfd int) (string, error)
 	HashLongName(name string) string
 	WriteLongNameAt(dirfd int, hashName string, plainName string) error
 	B64EncodeToString(src []byte) string

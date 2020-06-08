@@ -38,7 +38,7 @@ func (fs *FS) openBackingDir(relPath string) (dirfd int, cName string, err error
 			return dirfd, ".", nil
 		}
 		name := filepath.Base(relPath)
-		cName, err = fs.nameTransform.EncryptAndHashName(name, iv)
+		cName, err = fs.nameTransform.EncryptAndHashBadName(name, iv, dirfd)
 		if err != nil {
 			syscall.Close(dirfd)
 			return -1, "", err
@@ -62,13 +62,18 @@ func (fs *FS) openBackingDir(relPath string) (dirfd int, cName string, err error
 			syscall.Close(dirfd)
 			return -1, "", err
 		}
-		cName, err = fs.nameTransform.EncryptAndHashName(name, iv)
+		cName, err = fs.nameTransform.EncryptAndHashBadName(name, iv, dirfd)
 		if err != nil {
 			syscall.Close(dirfd)
 			return -1, "", err
 		}
+
 		// Last part? We are done.
 		if i == len(parts)-1 {
+			// cName, err = fs.searchBadNameFile(name, dirfd, iv)
+			// if err != nil {
+			// 	return -1, "", err
+			// }
 			fs.dirCache.Store(dirRelPath, dirfd, iv)
 			break
 		}
