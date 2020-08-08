@@ -15,7 +15,8 @@ import (
 
 const (
 	// Like ext4, we allow at most 255 bytes for a file name.
-	NameMax = 255
+	NameMax     = 255
+	BadNameFlag = " GOCRYPTFS_BAD_NAME"
 )
 
 // NameTransformer is an interface used to transform filenames.
@@ -66,10 +67,10 @@ func (n *NameTransform) DecryptName(cipherName string, iv []byte) (string, error
 				for charpos := len(cipherName) - 1; charpos > 0; charpos-- {
 					res, err = n.decryptName(cipherName[:charpos], iv)
 					if err == nil {
-						return res + cipherName[charpos:] + " GOCRYPTFS_BAD_NAME", nil
+						return res + cipherName[charpos:] + BadNameFlag, nil
 					}
 				}
-				return cipherName + " GOCRYPTFS_BAD_NAME", nil
+				return cipherName + BadNameFlag, nil
 			}
 		}
 	}

@@ -118,37 +118,54 @@ func (be *NameTransform) EncryptAndHashName(name string, iv []byte) (string, err
 	return cName, nil
 }
 
+// EncryptAndHashBadName tries to find the "name" substring, which (encrypted and hashed)
+// leads to an unique existing file
+// Returns ENOENT if cipher file does not exist or is not unique
 func (be *NameTransform) EncryptAndHashBadName(name string, iv []byte, dirfd int) (cName string, err error) {
-	cNameInt, errInt := be.EncryptAndHashName(name, iv)
-	if errInt != nil {
-		return "", errInt
-	}
-	// check if file exists
+	//Try if direct transformation is successful
 	var st unix.Stat_t
-	err = syscallcompat.Fstatat(dirfd, cNameInt, &st, unix.AT_SYMLINK_NOFOLLOW)
-	if err != nil && strings.HasSuffix(name, " GOCRYPTFS_BAD_NAME") {
-		// if this is the file name, check if it is a bad name
-		// check 1: undecryptable name?
-		err = syscallcompat.Fstatat(dirfd, name[:len(name)-len(" GOCRYPTFS_BAD_NAME")], &st, unix.AT_SYMLINK_NOFOLLOW)
-		if err != nil {
-			cNamePart := ""
-			// check 2: decrypted and appended suffix?
-			for charpos := len(name) - len(" GOCRYPTFS_BAD_NAME") - 1; charpos > 0; charpos-- {
-				//only use original cipher name and append assumed sufix (without badname flag)
-				cNamePart, err = be.EncryptAndHashName(name[:charpos], iv)
-				cNameBadReverse := cNamePart + name[charpos:len(name)-len(" GOCRYPTFS_BAD_NAME")]
-				err = syscallcompat.Fstatat(dirfd, cNameBadReverse, &st, unix.AT_SYMLINK_NOFOLLOW)
-				if err == nil {
-					return cNameBadReverse, nil
-				}
-			}
-		} else {
-			return name[:len(name)-len(" GOCRYPTFS_BAD_NAME")], nil
-
+	var filesFound int = 0
+	lastFoundName, err := be.EncryptAndHashName(name, iv)
+	//Same behaviour as EncryptAndHashName when Badnamnes disabled by args
+	//err can be "name too long"
+	if err != nil {
+		return "", err
+	}
+	err = syscallcompat.Fstatat(dirfd, lastFoundName, &st, unix.AT_SYMLINK_NOFOLLOW)
+	if err == nil {
+		//file found, return result
+		return lastFoundName, nil
+	} else if strings.HasSuffix(name, BadNameFlag) {
+		//check if the name was tranformed without change (bad name and undecryptable)
+		err = syscallcompat.Fstatat(dirfd, name[:len(name)-len(BadNameFlag)], &st, unix.AT_SYMLINK_NOFOLLOW)
+		if err == nil {
+			filesFound++
+			lastFoundName = name[:len(name)-len(BadNameFlag)]
 		}
+		// if this is the file name, check if :it is a bad name
+		for charpos := len(name) - len(BadNameFlag); charpos > 0; charpos-- {
+			//only use original cipher name and append assumed suffix (without badname flag)
+			cNamePart := be.EncryptName(name[:charpos], iv)
+			if be.longNames && len(cName) > NameMax {
+				cNamePart = be.HashLongName(cName)
+			}
+			cNameBadReverse := cNamePart + name[charpos:len(name)-len(BadNameFlag)]
+			err = syscallcompat.Fstatat(dirfd, cNameBadReverse, &st, unix.AT_SYMLINK_NOFOLLOW)
+			if err == nil {
+				filesFound++
+				lastFoundName = cNameBadReverse
+			}
+		}
+	} else {
+		/* No Bad name flag, ingnore */
+		return "", syscall.ENOENT
 	}
 
-	return cNameInt, nil
+	if filesFound == 1 {
+		return lastFoundName, nil
+	}
+	/* more than 1 possible file found, ignore */
+	return "", syscall.ENOENT
 }
 
 // Dir is like filepath.Dir but returns "" instead of ".".

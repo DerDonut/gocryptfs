@@ -19,7 +19,7 @@ func filterXattrSetFlags(flags int) int {
 }
 
 func (fs *FS) getXAttr(relPath string, cAttr string, context *fuse.Context) ([]byte, fuse.Status) {
-	dirfd, cName, err := fs.openBackingDir(relPath)
+	dirfd, cName, err := fs.openBackingDirBadName(relPath)
 	if err != nil {
 		return nil, fuse.ToStatus(err)
 	}
@@ -34,7 +34,7 @@ func (fs *FS) getXAttr(relPath string, cAttr string, context *fuse.Context) ([]b
 }
 
 func (fs *FS) setXAttr(relPath string, cAttr string, cData []byte, flags int, context *fuse.Context) fuse.Status {
-	dirfd, cName, err := fs.openBackingDir(relPath)
+	dirfd, cName, err := fs.openBackingDirBadName(relPath)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
@@ -46,7 +46,7 @@ func (fs *FS) setXAttr(relPath string, cAttr string, cData []byte, flags int, co
 }
 
 func (fs *FS) removeXAttr(relPath string, cAttr string, context *fuse.Context) fuse.Status {
-	dirfd, cName, err := fs.openBackingDir(relPath)
+	dirfd, cName, err := fs.openBackingDirBadName(relPath)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
@@ -58,7 +58,7 @@ func (fs *FS) removeXAttr(relPath string, cAttr string, context *fuse.Context) f
 }
 
 func (fs *FS) listXAttr(relPath string, context *fuse.Context) ([]string, fuse.Status) {
-	dirfd, cName, err := fs.openBackingDir(relPath)
+	dirfd, cName, err := fs.openBackingDirBadName(relPath)
 	if err != nil {
 		return nil, fuse.ToStatus(err)
 	}

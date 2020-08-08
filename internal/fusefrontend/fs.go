@@ -97,7 +97,7 @@ func (fs *FS) GetAttr(relPath string, context *fuse.Context) (*fuse.Attr, fuse.S
 	if fs.isFiltered(relPath) {
 		return nil, fuse.EPERM
 	}
-	dirfd, cName, err := fs.openBackingDir(relPath)
+	dirfd, cName, err := fs.openBackingDirBadName(relPath)
 	if err != nil {
 		return nil, fuse.ToStatus(err)
 	}
@@ -159,7 +159,7 @@ func (fs *FS) Open(path string, flags uint32, context *fuse.Context) (fuseFile n
 	fs.openWriteOnlyLock.RLock()
 	defer fs.openWriteOnlyLock.RUnlock()
 	// Symlink-safe open
-	dirfd, cName, err := fs.openBackingDir(path)
+	dirfd, cName, err := fs.openBackingDirBadName(path)
 	if err != nil {
 		return nil, fuse.ToStatus(err)
 	}
@@ -184,7 +184,7 @@ func (fs *FS) Open(path string, flags uint32, context *fuse.Context) (fuseFile n
 // openBackingFile opens the ciphertext file that backs relative plaintext
 // path "relPath". Always adds O_NOFOLLOW to the flags.
 func (fs *FS) openBackingFile(relPath string, flags int) (fd int, err error) {
-	dirfd, cName, err := fs.openBackingDir(relPath)
+	dirfd, cName, err := fs.openBackingDirBadName(relPath)
 	if err != nil {
 		return -1, err
 	}
@@ -295,7 +295,7 @@ func (fs *FS) Chmod(path string, mode uint32, context *fuse.Context) (code fuse.
 	if fs.isFiltered(path) {
 		return fuse.EPERM
 	}
-	dirfd, cName, err := fs.openBackingDir(path)
+	dirfd, cName, err := fs.openBackingDirBadName(path)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
@@ -313,7 +313,7 @@ func (fs *FS) Chown(path string, uid uint32, gid uint32, context *fuse.Context) 
 	if fs.isFiltered(path) {
 		return fuse.EPERM
 	}
-	dirfd, cName, err := fs.openBackingDir(path)
+	dirfd, cName, err := fs.openBackingDirBadName(path)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
@@ -380,7 +380,7 @@ func (fs *FS) Utimens(path string, a *time.Time, m *time.Time, context *fuse.Con
 	if fs.isFiltered(path) {
 		return fuse.EPERM
 	}
-	dirfd, cName, err := fs.openBackingDir(path)
+	dirfd, cName, err := fs.openBackingDirBadName(path)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
@@ -455,7 +455,7 @@ func (fs *FS) Unlink(path string, context *fuse.Context) (code fuse.Status) {
 	if fs.isFiltered(path) {
 		return fuse.EPERM
 	}
-	dirfd, cName, err := fs.openBackingDir(path)
+	dirfd, cName, err := fs.openBackingDirBadName(path)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
@@ -537,7 +537,7 @@ func (fs *FS) Rename(oldPath string, newPath string, context *fuse.Context) (cod
 	if fs.isFiltered(newPath) {
 		return fuse.EPERM
 	}
-	oldDirfd, oldCName, err := fs.openBackingDir(oldPath)
+	oldDirfd, oldCName, err := fs.openBackingDirBadName(oldPath)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
@@ -645,7 +645,7 @@ func (fs *FS) Access(relPath string, mode uint32, context *fuse.Context) (code f
 	if fs.isFiltered(relPath) {
 		return fuse.EPERM
 	}
-	dirfd, cName, err := fs.openBackingDir(relPath)
+	dirfd, cName, err := fs.openBackingDirBadName(relPath)
 	if err != nil {
 		return fuse.ToStatus(err)
 	}
