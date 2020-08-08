@@ -703,6 +703,13 @@ func TestSymlinkedCipherdir(t *testing.T) {
 
 // TestBadname tests the `-badname` option
 func TestBadname(t *testing.T) {
+
+	//TODO: Expand Testing to cover dynamic encryption of bad names
+	//Case 1: Generate BadName cipher file which is undecryptable (should be accessible)
+	//Case 2: Generate cipher Files which leads to multiple matches for BadName files (should not be accessible)
+	//Case 3: Generate BadName cipher file which is decryptable (see below, should be accessible)
+	//Case 4: Generate BadName cipher file which does not match display wildcard (don't use -badname=*, should be invisible and inaccessible)
+
 	dir := test_helpers.InitFS(t)
 	mnt := dir + ".mnt"
 	validFileName := "file"
@@ -738,7 +745,6 @@ func TestBadname(t *testing.T) {
 			break
 		}
 	}
-
 	// write invalid file which should be decodable
 	err = ioutil.WriteFile(dir+"/"+encryptedfilename+invalidSuffix, nil, 0600)
 	if err != nil {

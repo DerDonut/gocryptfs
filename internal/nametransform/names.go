@@ -15,7 +15,8 @@ import (
 
 const (
 	// Like ext4, we allow at most 255 bytes for a file name.
-	NameMax = 255
+	NameMax     = 255
+	BadNameFlag = " GOCRYPTFS_BAD_NAME"
 )
 
 // NameTransformer is an interface used to transform filenames.
@@ -23,6 +24,7 @@ type NameTransformer interface {
 	DecryptName(cipherName string, iv []byte) (string, error)
 	EncryptName(plainName string, iv []byte) string
 	EncryptAndHashName(name string, iv []byte) (string, error)
+	EncryptAndHashBadName(name string, iv []byte, dirfd int) (string, error)
 	HashLongName(name string) string
 	WriteLongNameAt(dirfd int, hashName string, plainName string) error
 	B64EncodeToString(src []byte) string

@@ -19,6 +19,20 @@ import (
 // openBackingDir is secure against symlink races by using Openat and
 // ReadDirIVAt.
 func (fs *FS) openBackingDir(relPath string) (dirfd int, cName string, err error) {
+	return fs.openBackingDirInt(relPath, false)
+}
+
+func (fs *FS) openBackingDirBadName(relPath string) (dirfd int, cName string, err error) {
+	ntransform, ok := fs.nameTransform.(*nametransform.NameTransform)
+	if ok && len(ntransform.BadnamePatterns) > 0 {
+		//BadName allowed, try to determine filenames
+		return fs.openBackingDirInt(relPath, true)
+	}
+	//No Badnames allowed, return direct transformation only or throw error
+	return fs.openBackingDirInt(relPath, false)
+}
+
+func (fs *FS) openBackingDirInt(relPath string, badnames bool) (dirfd int, cName string, err error) {
 	dirRelPath := nametransform.Dir(relPath)
 	// With PlaintextNames, we don't need to read DirIVs. Easy.
 	if fs.args.PlaintextNames {
@@ -38,7 +52,12 @@ func (fs *FS) openBackingDir(relPath string) (dirfd int, cName string, err error
 			return dirfd, ".", nil
 		}
 		name := filepath.Base(relPath)
-		cName, err = fs.nameTransform.EncryptAndHashName(name, iv)
+		if badnames {
+			cName, err = fs.nameTransform.EncryptAndHashBadName(name, iv, dirfd)
+		} else {
+			cName, err = fs.nameTransform.EncryptAndHashName(name, iv)
+		}
+
 		if err != nil {
 			syscall.Close(dirfd)
 			return -1, "", err
@@ -62,13 +81,23 @@ func (fs *FS) openBackingDir(relPath string) (dirfd int, cName string, err error
 			syscall.Close(dirfd)
 			return -1, "", err
 		}
-		cName, err = fs.nameTransform.EncryptAndHashName(name, iv)
+		if badnames {
+			cName, err = fs.nameTransform.EncryptAndHashBadName(name, iv, dirfd)
+		} else {
+			cName, err = fs.nameTransform.EncryptAndHashName(name, iv)
+		}
+
 		if err != nil {
 			syscall.Close(dirfd)
 			return -1, "", err
 		}
+
 		// Last part? We are done.
 		if i == len(parts)-1 {
+			// cName, err = fs.searchBadNameFile(name, dirfd, iv)
+			// if err != nil {
+			// 	return -1, "", err
+			// }
 			fs.dirCache.Store(dirRelPath, dirfd, iv)
 			break
 		}
