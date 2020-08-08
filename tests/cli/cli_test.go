@@ -745,7 +745,6 @@ func TestBadname(t *testing.T) {
 			break
 		}
 	}
-
 	// write invalid file which should be decodable
 	err = ioutil.WriteFile(dir+"/"+encryptedfilename+invalidSuffix, nil, 0600)
 	if err != nil {
