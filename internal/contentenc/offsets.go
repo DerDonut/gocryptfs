@@ -31,7 +31,11 @@ func (be *ContentEnc) BlockNoToPlainOff(blockNo uint64) uint64 {
 	return blockNo * be.plainBS
 }
 
-// CipherSizeToPlainSize calculates the plaintext size from a ciphertext size
+// CipherSizeToPlainSize calculates the plaintext size `plainSize` from a
+// ciphertext size `cipherSize` (in bytes).
+//
+// Not all ciphertext sizes are legal due to the per-block overheads.
+// For an illegal cipherSize, we return a best guess plainSize.
 func (be *ContentEnc) CipherSizeToPlainSize(cipherSize uint64) uint64 {
 	// Zero-sized files stay zero-sized
 	if cipherSize == 0 {
@@ -49,6 +53,15 @@ func (be *ContentEnc) CipherSizeToPlainSize(cipherSize uint64) uint64 {
 		return 0
 	}
 
+	// If the last block is incomplete, pad it to 1 byte of plaintext
+	// (= 33 bytes of ciphertext).
+	lastBlockSize := (cipherSize - HeaderLen) % be.cipherBS
+	if lastBlockSize > 0 && lastBlockSize <= be.BlockOverhead() {
+		tmp := cipherSize - lastBlockSize + be.BlockOverhead() + 1
+		tlog.Warn.Printf("cipherSize %d: incomplete last block (%d bytes), padding to %d bytes", cipherSize, lastBlockSize, tmp)
+		cipherSize = tmp
+	}
+
 	// Block number at last byte
 	blockNo := be.CipherOffToBlockNo(cipherSize - 1)
 	blockCount := blockNo + 1
@@ -63,20 +76,20 @@ func (be *ContentEnc) CipherSizeToPlainSize(cipherSize uint64) uint64 {
 	return cipherSize - overhead
 }
 
-// PlainSizeToCipherSize calculates the ciphertext size from a plaintext size
+// PlainSizeToCipherSize calculates the ciphertext size from a plaintext size.
 func (be *ContentEnc) PlainSizeToCipherSize(plainSize uint64) uint64 {
 	// Zero-sized files stay zero-sized
 	if plainSize == 0 {
 		return 0
 	}
+	return be.PlainOffToCipherOff(plainSize-1) + 1
+}
 
-	// Block number at last byte
-	blockNo := be.PlainOffToBlockNo(plainSize - 1)
-	blockCount := blockNo + 1
-
-	overhead := be.BlockOverhead()*blockCount + HeaderLen
-
-	return plainSize + overhead
+// PlainOffToCipherOff tells you the highest ciphertext offset that is
+// *guaranteed* to be written/read when you write/read at `plainOff`.
+func (be *ContentEnc) PlainOffToCipherOff(plainOff uint64) uint64 {
+	startOfBlock := be.BlockNoToCipherOff(be.PlainOffToBlockNo(plainOff))
+	return startOfBlock + plainOff%be.PlainBS() + be.BlockOverhead()
 }
 
 // ExplodePlainRange splits a plaintext byte range into (possibly partial) blocks

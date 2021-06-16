@@ -287,13 +287,13 @@ func (n *Node) Link(ctx context.Context, target fs.InodeEmbedder, name string, o
 			return
 		}
 		// Create "gocryptfs.longfile." link
-		err = syscallcompat.Linkat(dirfd2, cName2, dirfd, cName, 0)
+		err = unix.Linkat(dirfd2, cName2, dirfd, cName, 0)
 		if err != nil {
 			nametransform.DeleteLongNameAt(dirfd, cName)
 		}
 	} else {
 		// Create regular link
-		err = syscallcompat.Linkat(dirfd2, cName2, dirfd, cName, 0)
+		err = unix.Linkat(dirfd2, cName2, dirfd, cName, 0)
 	}
 	if err != nil {
 		errno = fs.ToErrno(err)
@@ -354,6 +354,9 @@ func (n *Node) Symlink(ctx context.Context, target, name string, out *fuse.Entry
 		errno = fs.ToErrno(err)
 		return
 	}
+	// Report the plaintext size, not the encrypted blob size
+	st.Size = int64(len(target))
+
 	inode = n.newChild(ctx, st, out)
 	return inode, 0
 }

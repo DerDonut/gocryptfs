@@ -260,6 +260,7 @@ func fsck(args *argContainer) (exitcode int) {
 		os.Exit(exitcodes.Usage)
 	}
 	args.allow_other = false
+	args.ro = true
 	var err error
 	args.mountpoint, err = ioutil.TempDir("", "gocryptfs.fsck.")
 	if err != nil {
@@ -295,6 +296,10 @@ func fsck(args *argContainer) (exitcode int) {
 		err = srv.Unmount()
 		if err != nil {
 			tlog.Warn.Printf("failed to unmount %q: %v", ck.mnt, err)
+		} else {
+			if err := syscall.Rmdir(ck.mnt); err != nil {
+				tlog.Warn.Printf("cleaning up %q failed: %v", ck.mnt, err)
+			}
 		}
 	}()
 	// Recursively check the root dir

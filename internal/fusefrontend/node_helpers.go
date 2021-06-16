@@ -58,6 +58,8 @@ func (n *Node) readlink(dirfd int, cName string) (out []byte, errno syscall.Errn
 }
 
 // translateSize translates the ciphertext size in `out` into plaintext size.
+// Handles regular files & symlinks (and finds out what is what by looking at
+// `out.Mode`).
 func (n *Node) translateSize(dirfd int, cName string, out *fuse.Attr) {
 	if out.IsRegular() {
 		rn := n.rootNode()
@@ -119,7 +121,13 @@ func (n *Node) prepareAtSyscall(child string) (dirfd int, cName string, errno sy
 		var iv []byte
 		dirfd, iv = rn.dirCache.Lookup(n)
 		if dirfd > 0 {
+			ntransform, ok := rn.nameTransform.(*nametransform.NameTransform)
 			cName, err := rn.nameTransform.EncryptAndHashName(child, iv)
+			if ok && len(ntransform.BadnamePatterns) > 0 {
+				//BadName allowed, try to determine filenames
+				cName, err = rn.nameTransform.EncryptAndHashBadName(child, iv, dirfd)
+			}
+
 			if err != nil {
 				return -1, "", fs.ToErrno(err)
 			}

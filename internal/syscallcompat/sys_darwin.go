@@ -131,22 +131,22 @@ func SymlinkatUser(oldpath string, newdirfd int, newpath string, context *fuse.C
 		defer pthread_setugid_np(KAUTH_UID_NONE, KAUTH_GID_NONE)
 	}
 
-	return Symlinkat(oldpath, newdirfd, newpath)
+	return unix.Symlinkat(oldpath, newdirfd, newpath)
 }
 
-func MkdiratUser(dirfd int, path string, mode uint32, caller *fuse.Caller) (err error) {
-	if caller != nil {
+func MkdiratUser(dirfd int, path string, mode uint32, context *fuse.Context) (err error) {
+	if context != nil {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 
-		err = pthread_setugid_np(caller.Uid, caller.Gid)
+		err = pthread_setugid_np(context.Owner.Uid, context.Owner.Gid)
 		if err != nil {
 			return err
 		}
 		defer pthread_setugid_np(KAUTH_UID_NONE, KAUTH_GID_NONE)
 	}
 
-	return Mkdirat(dirfd, path, mode)
+	return unix.Mkdirat(dirfd, path, mode)
 }
 
 type attrList struct {
@@ -216,6 +216,11 @@ func UtimesNanoAtNofollow(dirfd int, path string, a *time.Time, m *time.Time) (e
 }
 
 func Getdents(fd int) ([]fuse.DirEntry, error) {
+	entries, _, err := emulateGetdents(fd)
+	return entries, err
+}
+
+func GetdentsSpecial(fd int) (entries []fuse.DirEntry, entriesSpecial []fuse.DirEntry, err error) {
 	return emulateGetdents(fd)
 }
 

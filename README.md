@@ -96,17 +96,28 @@ as well as in the go-fuse library.
 Compile
 -------
 
-With go 1.11 or higher:
+Install Go 1.11 or higher:
+
+* Debian/Ubuntu: `apt install golang`
+* Fedora: `dnf install golang`
+
+Then, download the source code and compile:
 
 	$ git clone https://github.com/rfjakob/gocryptfs.git
 	$ cd gocryptfs
-	$ ./build.bash
-
-build.bash needs the OpenSSL headers installed (Debian: `apt install libssl-dev`,
-Fedora: `dnf install openssl-devel`). Alternatively, you can compile
-without OpenSSL using
-
 	$ ./build-without-openssl.bash
+
+This will compile a static binary that uses the Go stdlib crypto backend.
+
+If you want to use the OpenSSL crypto backend (faster on
+old CPUs lacking AES-NI), you have to install a few dependencies:
+
+* Debian/Ubuntu: `apt install libssl-dev gcc pkg-config`
+* Fedora: `dnf install openssl-devel gcc pkg-config`
+
+Then, run:
+
+	$ ./build.bash
 
 Use
 ---
@@ -166,9 +177,11 @@ Example for a CPU without AES-NI:
 
 ```
 $ ./gocryptfs -speed
-AES-GCM-256-OpenSSL    165.67 MB/s  (selected in auto mode)
-AES-GCM-256-Go          49.62 MB/s
-AES-SIV-512-Go          39.98 MB/s
+gocryptfs v2.0; go-fuse v2.1.1-0.20210508151621-62c5aa1919a7; 2021-06-06 go1.16.5 linux/amd64
+AES-GCM-256-OpenSSL    536.63 MB/s  
+AES-GCM-256-Go         831.84 MB/s  (selected in auto mode)
+AES-SIV-512-Go         155.85 MB/s  
+XChaCha20-Poly1305-Go  700.02 MB/s  (benchmark only, not selectable yet)
 ```
 
 You can run `./benchmark.bash` to run gocryptfs' canonical set of
@@ -177,22 +190,30 @@ tarball, recursively listing and finally deleting it. The output will
 look like this:
 
 ```
-$ ./benchmark.bash
-Testing gocryptfs at /tmp/benchmark.bash.DwL: gocryptfs v1.6; go-fuse v20170619-45-g95c6370; 2018-08-18 go1.10.3
-WRITE: 262144000 bytes (262 MB, 250 MiB) copied, 1.1033 s, 238 MB/s
-READ:  262144000 bytes (262 MB, 250 MiB) copied, 0.945291 s, 277 MB/s
-UNTAR: 17.768
-MD5:   8.459
-LS:    1.460
-RM:    3.379
+$ ./benchmark.bash 
+Testing gocryptfs at /tmp/benchmark.bash.xFD: gocryptfs v2.0; go-fuse v2.1.1-0.20210508151621-62c5aa1919a7; 2021-06-06 go1.16.5 linux/amd64
+WRITE: 262144000 bytes (262 MB, 250 MiB) copied, 0,698174 s, 375 MB/s
+READ:  262144000 bytes (262 MB, 250 MiB) copied, 0,268916 s, 975 MB/s
+UNTAR: 8,970
+MD5:   4,846
+LS:    1,851
+RM:    2,367
 ```
 
 Changelog
 ---------
 
+v2.0.1, 2021-06-07
+* Fix symlink creation reporting the wrong size, causing git to report it as modified
+  ([#574](https://github.com/rfjakob/gocryptfs/issues/574))
+
+v2.0, 2021-06-05
+* Fix a few [issues discovered by xfstests](https://github.com/rfjakob/fuse-xfstests/wiki/results_2021-05-19)
+  * Biggest change: rewrite SEEK_HOLE / SEEK_DATA logic (now emulates 4k alignment)
+
 v2.0-beta4, 2021-05-15
-* Make ACLs *actually* work (pass `-acl` to enable) ([#536](https://github.com/rfjakob/gocryptfs/issues/536))
-* Blocklist RENAME_EXCHANGE and RENAME_WHITEOUT (broken as discovered by [fuse-xfstest/gocryptfs-2019-12](https://github.com/rfjakob/fuse-xfstests/tree/gocryptfs-2019-12))
+* **Make ACLs *actually* work (pass `-acl` to enable)** ([#536](https://github.com/rfjakob/gocryptfs/issues/536))
+* Blocklist `RENAME_EXCHANGE` and `RENAME_WHITEOUT` (broken as discovered by [fuse-xfstest/gocryptfs-2019-12](https://github.com/rfjakob/fuse-xfstests/tree/gocryptfs-2019-12))
 
 v2.0-beta3, 2021-04-24
 * MANPAGE: Split options into sections acc. to where they apply ([#517](https://github.com/rfjakob/gocryptfs/issues/517))

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/hanwen/go-fuse/v2/fuse"
+
 	"github.com/rfjakob/gocryptfs/internal/tlog"
 )
 
@@ -56,12 +58,14 @@ func (n *Node) Getxattr(ctx context.Context, attr string, dest []byte) (uint32, 
 		}
 	} else {
 		// encrypted user xattr
-		cAttr := rn.encryptXattrName(attr)
+		cAttr, err := rn.encryptXattrName(attr)
+		if err != nil {
+			return minus1, syscall.EIO
+		}
 		cData, errno := n.getXAttr(cAttr)
 		if errno != 0 {
 			return 0, errno
 		}
-		var err error
 		data, err = rn.decryptXattrValue(cData)
 		if err != nil {
 			tlog.Warn.Printf("GetXAttr: %v", err)
@@ -88,12 +92,20 @@ func (n *Node) Setxattr(ctx context.Context, attr string, data []byte, flags uin
 
 	// ACLs are passed through without encryption
 	if isAcl(attr) {
-		return n.setXAttr(attr, data, flags)
+		// result of setting an acl depends on the user doing it
+		var context *fuse.Context
+		if rn.args.PreserveOwner {
+			context = toFuseCtx(ctx)
+		}
+		return n.setXAttr(context, attr, data, flags)
 	}
 
-	cAttr := rn.encryptXattrName(attr)
+	cAttr, err := rn.encryptXattrName(attr)
+	if err != nil {
+		return syscall.EINVAL
+	}
 	cData := rn.encryptXattrValue(data)
-	return n.setXAttr(cAttr, cData, flags)
+	return n.setXAttr(nil, cAttr, cData, flags)
 }
 
 // RemoveXAttr - FUSE call.
@@ -107,7 +119,10 @@ func (n *Node) Removexattr(ctx context.Context, attr string) syscall.Errno {
 		return n.removeXAttr(attr)
 	}
 
-	cAttr := rn.encryptXattrName(attr)
+	cAttr, err := rn.encryptXattrName(attr)
+	if err != nil {
+		return syscall.EINVAL
+	}
 	return n.removeXAttr(cAttr)
 }
 
